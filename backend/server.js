@@ -223,6 +223,36 @@ app.use((err, req, res, next) => {
 // Export for Vercel (serverless)
 module.exports = app;
 
+// ===== SYSTEM SAFETY & SEEDING =====
+
+// 5) Health Check
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", uptime: process.uptime() });
+});
+
+// 6) Seed Data
+app.post("/api/seed", (req, res) => {
+  // Add some dummy users if empty
+  if (users.length === 0) {
+    users.push(
+      { id: 1, name: "Alice Admin", email: "alice@example.com", password: "password123", role: "admin" },
+      { id: 2, name: "Bob Builder", email: "bob@example.com", password: "password123", role: "seeker" }
+    );
+  }
+  return res.json({ message: "Seeded successfully", users_count: users.length });
+});
+
+// Prevent crash on unhandled errors
+process.on('uncaughtException', (err) => {
+  console.error('CRITICAL: Uncaught Exception:', err);
+  // In production you might exit, but for this demo we keep running to avoid "Connection Refused"
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+
 // Only listen if run directly
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import GlassCard from '../components/ui/GlassCard';
 import Button from '../components/ui/Button';
-import { Upload, User, Mail, Lock, Phone, FileText } from 'lucide-react';
+import { Upload, User, Mail, Lock, Phone, ArrowLeft, Loader2, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 
@@ -38,7 +38,6 @@ const Register = () => {
             if (authError) throw authError;
 
             // 2. ATS Analysis (backend)
-            // Only proceed if resume is provided, otherwise just navigate
             if (file) {
                 const res = await fetch('/register', {
                     method: 'POST',
@@ -48,21 +47,18 @@ const Register = () => {
                 const data = await res.json();
 
                 if (!res.ok) {
-                    // Start soft error, maybe just alert but don't block registration success
                     console.error("ATS Analysis failed:", data.error);
                 } else if (data.atsScore) {
                     setAtsScore(data.atsScore);
-                    // Show success and redirect after short delay
                     setTimeout(() => {
                         navigate('/login');
-                    }, 2000);
-                    return; // Return early to show score
+                    }, 2500);
+                    return;
                 }
             }
 
-            // If no file or analysis done, standard redirect
             if (!atsScore) {
-                alert('Registration successful! Please check your email for verification.');
+                // If no analysis needed or just manual
                 navigate('/login');
             }
 
@@ -81,103 +77,102 @@ const Register = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4">
-            <GlassCard className="w-full max-w-md relative overflow-hidden">
-                {/* Clean B&W Background - Removed colored blobs */}
+        <div className="min-h-screen flex items-center justify-center p-4 overflow-hidden relative">
+            {/* Dynamic Background Elements */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+                <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-[120px] animate-pulse"></div>
+                <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-emerald-600/10 rounded-full blur-[120px] animate-pulse delay-700"></div>
+            </div>
 
-                <div className="relative z-10">
-                    <h2 className="text-3xl font-bold text-center mb-2 text-white">
-                        Create Account
-                    </h2>
-                    <p className="text-center text-white/60 mb-8 text-sm">Join SmartHire and analyze your potential</p>
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="z-10 w-full max-w-lg perspective-1000"
+            >
+                <GlassCard className="w-full relative overflow-hidden border border-white/20 shadow-2xl backdrop-blur-xl bg-white/5">
 
-                    {atsScore !== null ? (
-                        <motion.div
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="text-center py-8"
-                        >
-                            <div className="w-24 h-24 rounded-full bg-white/10 border border-white/20 mx-auto flex items-center justify-center text-3xl font-bold text-white shadow-lg mb-4">
-                                {atsScore}
-                            </div>
-                            <h3 className="text-xl font-semibold text-white">Registration Successful!</h3>
-                            <p className="text-white/70 mt-2">Your ATS Score</p>
-                            <p className="text-xs text-white/50 mt-4">Redirecting to login...</p>
-                        </motion.div>
-                    ) : (
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            {[
-                                { name: "name", type: "text", placeholder: "Full Name", icon: User },
-                                { name: "email", type: "email", placeholder: "Email Address", icon: Mail },
-                                { name: "phone", type: "tel", placeholder: "Phone Number", icon: Phone },
-                                { name: "password", type: "password", placeholder: "Password", icon: Lock },
-                            ].map((field, idx) => (
-                                <motion.div
-                                    key={field.name}
-                                    initial={{ x: -20, opacity: 0 }}
-                                    animate={{ x: 0, opacity: 1 }}
-                                    transition={{ delay: 0.1 * idx }}
-                                    className="relative group"
-                                >
-                                    <field.icon className="absolute left-3 top-3.5 w-5 h-5 text-white/40 group-focus-within:text-white transition-colors" />
-                                    <input
-                                        required={field.name !== 'phone'}
-                                        name={field.name}
-                                        type={field.type}
-                                        placeholder={field.placeholder}
-                                        className="input-glass pl-10"
-                                    />
+                    <div className="relative z-10 p-2">
+                        <div className="text-center mb-8">
+                            <motion.h2
+                                initial={{ y: -20, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                className="text-4xl font-extrabold tracking-tight text-white mb-2"
+                            >
+                                Create <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">Account</span>
+                            </motion.h2>
+                            <p className="text-white/50 text-sm">Join SmartHire and inspect your resume</p>
+                        </div>
+
+                        {atsScore !== null ? (
+                            <motion.div
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="text-center py-12"
+                            >
+                                <div className="relative w-32 h-32 mx-auto mb-6">
+                                    <div className="absolute inset-0 bg-emerald-500 rounded-full blur-xl opacity-20 animate-pulse"></div>
+                                    <div className="relative w-full h-full rounded-full bg-gradient-to-tr from-emerald-500 to-green-600 flex items-center justify-center text-4xl font-bold text-white shadow-2xl border-4 border-emerald-400/30">
+                                        {atsScore}
+                                    </div>
+                                    <div className="absolute -top-2 -right-2 bg-white rounded-full p-2 shadow-lg">
+                                        <CheckCircle className="w-6 h-6 text-emerald-500" />
+                                    </div>
+                                </div>
+
+                                <h3 className="text-2xl font-bold text-white mb-2">Registration Complete!</h3>
+                                <p className="text-emerald-300 font-medium">Your Initial ATS Score</p>
+                                <p className="text-white/40 text-sm mt-8 animate-pulse">Redirecting you to login...</p>
+                            </motion.div>
+                        ) : (
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="relative group">
+                                        <User className="absolute left-4 top-3.5 w-5 h-5 text-white/40 group-focus-within:text-purple-400 transition-colors" />
+                                        <input required name="name" type="text" placeholder="Full Name" className="w-full bg-black/20 border border-white/10 rounded-xl px-12 py-3.5 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
+                                    </motion.div>
+
+                                    <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="relative group">
+                                        <Phone className="absolute left-4 top-3.5 w-5 h-5 text-white/40 group-focus-within:text-purple-400 transition-colors" />
+                                        <input name="phone" type="tel" placeholder="Phone" className="w-full bg-black/20 border border-white/10 rounded-xl px-12 py-3.5 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
+                                    </motion.div>
+                                </div>
+
+                                <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="relative group">
+                                    <Mail className="absolute left-4 top-3.5 w-5 h-5 text-white/40 group-focus-within:text-purple-400 transition-colors" />
+                                    <input required name="email" type="email" placeholder="Email Address" className="w-full bg-black/20 border border-white/10 rounded-xl px-12 py-3.5 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
                                 </motion.div>
-                            ))}
 
-                            <motion.div
-                                initial={{ y: 20, opacity: 0 }}
-                                animate={{ y: 0, opacity: 1 }}
-                                transition={{ delay: 0.4 }}
-                                className="relative group"
-                            >
-                                <input
-                                    required
-                                    name="resume"
-                                    type="file"
-                                    id="resume-upload"
-                                    className="hidden"
-                                    accept=".pdf,.docx,.doc"
-                                    onChange={handleFileChange}
-                                />
-                                <label
-                                    htmlFor="resume-upload"
-                                    className={`input-glass flex items-center gap-3 cursor-pointer hover:bg-white/10 ${file ? 'text-white border-white/30' : 'text-white/60'}`}
-                                >
-                                    <Upload className="w-5 h-5" />
-                                    <span className="truncate">{file ? file.name : "Upload Resume (PDF/DOCX)"}</span>
-                                </label>
-                            </motion.div>
+                                <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="relative group">
+                                    <Lock className="absolute left-4 top-3.5 w-5 h-5 text-white/40 group-focus-within:text-purple-400 transition-colors" />
+                                    <input required name="password" type="password" placeholder="Password" className="w-full bg-black/20 border border-white/10 rounded-xl px-12 py-3.5 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
+                                </motion.div>
 
-                            <motion.div
-                                initial={{ y: 20, opacity: 0 }}
-                                animate={{ y: 0, opacity: 1 }}
-                                transition={{ delay: 0.5 }}
-                            >
-                                <Button type="submit" className="w-full mt-6" isLoading={loading}>
-                                    Register & Analyze
-                                </Button>
-                            </motion.div>
+                                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.5 }}>
+                                    <input required name="resume" type="file" id="resume-upload" className="hidden" accept=".pdf,.docx,.doc" onChange={handleFileChange} />
+                                    <label htmlFor="resume-upload" className={`w-full flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${file ? 'border-emerald-500/50 bg-emerald-500/10' : 'border-white/10 hover:border-white/30 hover:bg-white/5'}`}>
+                                        <Upload className={`w-8 h-8 mb-2 ${file ? 'text-emerald-400' : 'text-white/40'}`} />
+                                        <span className={`text-sm font-medium ${file ? 'text-emerald-300' : 'text-white/60'}`}>{file ? file.name : "Upload Resume (PDF/DOCX)"}</span>
+                                    </label>
+                                </motion.div>
 
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                transition={{ delay: 0.6 }}
-                                className="text-center mt-4"
-                            >
-                                <p className="text-sm text-white/50">
-                                    Already have an account? <Link to="/login" className="text-white hover:text-white/80 underline decoration-white/30 underline-offset-4">Log in</Link>
-                                </p>
-                            </motion.div>
-                        </form>
-                    )}
-                </div>
-            </GlassCard>
+                                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.6 }}>
+                                    <Button type="submit" className="w-full py-4 text-base font-bold bg-gradient-to-r from-purple-600 to-emerald-600 hover:from-purple-500 hover:to-emerald-500 shadow-lg shadow-emerald-500/20" disabled={loading}>
+                                        {loading ? (
+                                            <span className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Analyze & Register</span>
+                                        ) : ("Create Account")}
+                                    </Button>
+                                </motion.div>
+
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="text-center mt-6">
+                                    <Link to="/login" className="inline-flex items-center text-sm text-white/40 hover:text-white transition-colors">
+                                        <ArrowLeft className="w-4 h-4 mr-2" /> Back to Login
+                                    </Link>
+                                </motion.div>
+                            </form>
+                        )}
+                    </div>
+                </GlassCard>
+            </motion.div>
         </div>
     );
 };
