@@ -106,27 +106,36 @@ const Register = () => {
                         </motion.div>
                     ) : (
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="relative group">
-                                <User className="absolute left-3 top-3.5 w-5 h-5 text-white/40 group-focus-within:text-white transition-colors" />
-                                <input required name="name" type="text" placeholder="Full Name" className="input-glass pl-10" />
-                            </div>
+                            {[
+                                { name: "name", type: "text", placeholder: "Full Name", icon: User },
+                                { name: "email", type: "email", placeholder: "Email Address", icon: Mail },
+                                { name: "phone", type: "tel", placeholder: "Phone Number", icon: Phone },
+                                { name: "password", type: "password", placeholder: "Password", icon: Lock },
+                            ].map((field, idx) => (
+                                <motion.div
+                                    key={field.name}
+                                    initial={{ x: -20, opacity: 0 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    transition={{ delay: 0.1 * idx }}
+                                    className="relative group"
+                                >
+                                    <field.icon className="absolute left-3 top-3.5 w-5 h-5 text-white/40 group-focus-within:text-white transition-colors" />
+                                    <input
+                                        required={field.name !== 'phone'}
+                                        name={field.name}
+                                        type={field.type}
+                                        placeholder={field.placeholder}
+                                        className="input-glass pl-10"
+                                    />
+                                </motion.div>
+                            ))}
 
-                            <div className="relative group">
-                                <Mail className="absolute left-3 top-3.5 w-5 h-5 text-white/40 group-focus-within:text-white transition-colors" />
-                                <input required name="email" type="email" placeholder="Email Address" className="input-glass pl-10" />
-                            </div>
-
-                            <div className="relative group">
-                                <Phone className="absolute left-3 top-3.5 w-5 h-5 text-white/40 group-focus-within:text-white transition-colors" />
-                                <input name="phone" type="tel" placeholder="Phone Number" className="input-glass pl-10" />
-                            </div>
-
-                            <div className="relative group">
-                                <Lock className="absolute left-3 top-3.5 w-5 h-5 text-white/40 group-focus-within:text-white transition-colors" />
-                                <input required name="password" type="password" placeholder="Password" className="input-glass pl-10" />
-                            </div>
-
-                            <div className="relative group">
+                            <motion.div
+                                initial={{ y: 20, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                transition={{ delay: 0.4 }}
+                                className="relative group"
+                            >
                                 <input
                                     required
                                     name="resume"
@@ -143,17 +152,28 @@ const Register = () => {
                                     <Upload className="w-5 h-5" />
                                     <span className="truncate">{file ? file.name : "Upload Resume (PDF/DOCX)"}</span>
                                 </label>
-                            </div>
+                            </motion.div>
 
-                            <Button type="submit" className="w-full mt-6" isLoading={loading}>
-                                Register & Analyze
-                            </Button>
+                            <motion.div
+                                initial={{ y: 20, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                transition={{ delay: 0.5 }}
+                            >
+                                <Button type="submit" className="w-full mt-6" isLoading={loading}>
+                                    Register & Analyze
+                                </Button>
+                            </motion.div>
 
-                            <div className="text-center mt-4">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.6 }}
+                                className="text-center mt-4"
+                            >
                                 <p className="text-sm text-white/50">
                                     Already have an account? <Link to="/login" className="text-white hover:text-white/80 underline decoration-white/30 underline-offset-4">Log in</Link>
                                 </p>
-                            </div>
+                            </motion.div>
                         </form>
                     )}
                 </div>

@@ -207,7 +207,18 @@ app.post("/analyze-resume", upload.single("resume"), async (req, res) => {
   }
 });
 
-// ===== START SERVER =====
+// ===== ERROR HANDLING =====
+// Force JSON for 404
+app.use((req, res) => {
+  res.status(404).json({ message: "Endpoint not found" });
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error("Global Server Error:", err);
+  res.status(500).json({ message: "Internal Server Error", error: err.message });
+});
+
 // ===== START SERVER =====
 // Export for Vercel (serverless)
 module.exports = app;
