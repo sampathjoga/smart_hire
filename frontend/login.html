@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sign In – SmartHire</title>
+  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body>
+  <div class="page">
+    <!-- HEADER -->
+    <header class="header">
+      <a href="index.html" class="logo">
+        SmartHire <span>- AI JOB PORTAL</span>
+      </a>
+      <nav class="nav">
+        <a href="register.html" class="btn-outline">Register</a>
+      </nav>
+    </header>
+
+    <!-- MAIN -->
+    <main class="main auth-main">
+      <section class="auth-container">
+        <div class="auth-card">
+          <h1 class="auth-title">Sign in</h1>
+          <p class="auth-subtitle">
+            Welcome back! Sign in to continue your job search.
+          </p>
+
+          <form id="loginForm" class="auth-form">
+            <div class="form-group">
+              <label for="loginEmail">Email</label>
+              <input type="email" id="loginEmail" name="email" required />
+            </div>
+
+            <div class="form-group">
+              <label for="loginPassword">Password</label>
+              <input type="password" id="loginPassword" name="password" required />
+            </div>
+
+            <button type="submit" class="btn-primary auth-btn">
+              Sign In
+            </button>
+
+            <p class="auth-footer-text">
+              Don’t have an account?
+              <a href="register.html" class="link-inline">Register</a>
+            </p>
+
+            <p id="loginMessage" class="auth-message"></p>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      © 2025 SmartHire. All rights reserved.
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SmartHire – AI Job Portal</title>
+  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body>
+  <div class="page">
+    <!-- HEADER -->
+    <header class="header">
+      <div class="logo">
+        SmartHire <span>- AI JOB PORTAL</span>
+      </div>
+
+      <!-- Right side of header -->
+       <nav class="nav">
+    <a href="login.html" class="nav-link">Sign In</a>
+    <a href="register.html" class="btn-outline" style="text-decoration:none">Register</a>
+  </nav>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+      <!-- HERO SECTION -->
+      <section class="hero">
+        <h1 class="hero-title">Find the job that fits you</h1>
+        <p class="hero-subtitle">
+          AI-powered job recommendations and resume analysis to boost your career.
+        </p>
+
+        <!-- Job search bar -->
+        <form id="searchForm" class="search-bar">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Search jobs (e.g. Software Engineer, React, Bangalore)"
+          />
+          <button type="submit" class="btn-primary">Search</button>
+        </form>
+
+        <!-- AI Resume Analyzer -->
+        <form id="resumeForm" class="resume-form" enctype="multipart/form-data">
+          <label for="resumeInput" class="file-label">
+            <span id="fileLabelText">Upload resume (PDF / DOCX)</span>
+            <input
+              type="file"
+              id="resumeInput"
+              name="resume"
+              accept=".pdf,.doc,.docx"
+              hidden
+            />
+          </label>
+          <button type="submit" class="btn-secondary">
+            AI Resume Analyzer
+          </button>
+        </form>
+
+        <div id="analysisResult" class="analysis-result"></div>
+      </section>
+
+      <!-- RECOMMENDED JOBS -->
+      <section class="jobs">
+        <h2 class="section-title">Recommended Jobs</h2>
+
+        <div class="jobs-grid" id="jobsGrid">
+          <article class="job-card">
+            <h3>Software Engineer</h3>
+            <p class="company">Tech Solutions • New York, NY</p>
+            <p class="meta">Full-time · ₹12–18 LPA</p>
+          </article>
+
+          <article class="job-card">
+            <h3>Marketing Manager</h3>
+            <p class="company">Creative Agency • Los Angeles, CA</p>
+            <p class="meta">Full-time · ₹10–15 LPA</p>
+          </article>
+
+          <article class="job-card">
+            <h3>Data Scientist</h3>
+            <p class="company">Innovative Analytics • San Francisco, CA</p>
+            <p class="meta">Full-time · ₹18–25 LPA</p>
+          </article>
+
+          <article class="job-card">
+            <h3>Product Designer</h3>
+            <p class="company">Design Studio • Austin, TX</p>
+            <p class="meta">Full-time · ₹9–14 LPA</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      © 2025 SmartHire. All rights reserved.
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
