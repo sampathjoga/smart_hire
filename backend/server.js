@@ -15,6 +15,42 @@ app.use(cors()); // allow requests from frontend (development)
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// ... Helper for Gemini Analysis ...
+async function analyzeWithGemini(text) {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: `Analyze this resume and give ATS score (0-100). Also provide a short summary and list 3 key skills. Format the response as JSON with keys: 'score' (number), 'summary' (string), 'skills' (array of strings).\n\nResume Text:\n${text}`,
+              },
+            ],
+          },
+        ],
+      }),
+    }
+  );
+
+  const data = await response.json();
+  let outputText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+  // Clean up markdown code blocks if present
+  outputText = outputText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+  try {
+    return JSON.parse(outputText);
+  } catch (e) {
+    console.error("Failed to parse Gemini JSON:", e);
+    // Fallback object if parsing fails
+    return { score: 0, summary: "Could not analyze resume.", skills: [] };
+  }
+}
+
 // ===== TEMP "DATABASE" FOR DEMO =====
 // In real project, replace with MongoDB.
 const users = [];
@@ -114,28 +150,7 @@ app.post("/register", upload.single("resume"), async (req, res) => {
     // Read uploaded resume file as text
     const resumeText = fs.readFileSync(resumeFile.path, "utf8");
 
-    // Call Gemini API for ATS analysis
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `Analyze this resume and give ATS score (0-100):\n\n${resumeText}`,
-                },
-              ],
-            },
-          ],
-        }),
-      }
-    );
-
-    const data = await response.json();
-    const output = data?.candidates?.[0]?.content?.parts?.[0]?.text || "No response";
+    const output = await analyzeWithGemini(resumeText);
 
     // try to extract a number as ATS score
     const scoreMatch = output.match(/(\d{1,3})/);
@@ -151,6 +166,43 @@ app.post("/register", upload.single("resume"), async (req, res) => {
     });
   } catch (err) {
     console.error("Gemini /register error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// =====================================================
+// 4) NEW: /analyze-resume (used by Dashboard.jsx)
+// =====================================================
+app.post("/analyze-resume", upload.single("resume"), async (req, res) => {
+  try {
+    const resumeFile = req.file;
+    if (!resumeFile) {
+      return res.status(400).json({ error: "Resume file required" });
+    }
+
+    const resumeText = fs.readFileSync(resumeFile.path, "utf8");
+
+    // Perform Analysis
+    const parsedAnalysis = await analyzeWithGemini(resumeText);
+
+    // Remove temp file
+    fs.unlinkSync(resumeFile.path);
+
+    // Dummy recommended jobs based on skills (in a real app, search DB)
+    const recommendedJobs = [
+      { title: "Senior Developer", company: "TechCorp", location: "Remote", type: "Full-time", salaryRange: "$120k - $150k" },
+      { title: "Frontend Engineer", company: "WebSolutions", location: "New York", type: "Contract", salaryRange: "$90k - $110k" },
+      { title: "Full Stack Dev", company: "StartupX", location: "San Francisco", type: "Full-time", salaryRange: "$130k+" }
+    ];
+
+    return res.json({
+      message: "Analysis successful",
+      parsed: parsedAnalysis,
+      recommendedJobs
+    });
+
+  } catch (err) {
+    console.error("/analyze-resume error:", err);
     return res.status(500).json({ error: err.message });
   }
 });

@@ -4,6 +4,7 @@ import Button from '../components/ui/Button';
 import { Search, Upload, Briefcase, MapPin, DollarSign, LogOut, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -12,9 +13,8 @@ const Dashboard = () => {
     const [analysis, setAnalysis] = useState(null); // { summary, score, skills }
     const [activeTab, setActiveTab] = useState('search'); // 'search' or 'analyze'
 
-    const handleLogout = () => {
-        localStorage.removeItem("smarthire_token");
-        localStorage.removeItem("smarthire_user");
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
         navigate('/login');
     };
 
@@ -47,12 +47,10 @@ const Dashboard = () => {
         const fd = new FormData();
         fd.append("resume", file);
 
-        const token = localStorage.getItem("smarthire_token");
-
         try {
             const res = await fetch('/analyze-resume', {
                 method: 'POST',
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                // Verification optional for now, backend public endpoint
                 body: fd,
             });
             const data = await res.json();
@@ -74,7 +72,7 @@ const Dashboard = () => {
     // Safe header container
     const Header = () => (
         <nav className="flex justify-between items-center py-6 mb-8">
-            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+            <h1 className="text-2xl font-bold text-white">
                 SmartHire
             </h1>
             <button onClick={handleLogout} className="text-white/60 hover:text-white flex items-center gap-2 text-sm transition-colors">
@@ -90,7 +88,7 @@ const Dashboard = () => {
             {/* Hero Section */}
             <section className="text-center mb-12">
                 <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight">
-                    Find your <span className="text-purple-400">dream job</span> with AI
+                    Find your <span className="text-white border-b-2 border-white/30">dream job</span> with AI
                 </h2>
                 <p className="text-lg text-white/60 max-w-2xl mx-auto">
                     Analyze your resume to find the perfect match or search manually through our extensive database.
@@ -101,13 +99,13 @@ const Dashboard = () => {
             <div className="flex justify-center gap-4 mb-8">
                 <button
                     onClick={() => setActiveTab('search')}
-                    className={`px-6 py-2 rounded-full transition-all ${activeTab === 'search' ? 'bg-white/20 text-white shadow-lg' : 'text-white/40 hover:text-white/80'}`}
+                    className={`px-6 py-2 rounded-full transition-all ${activeTab === 'search' ? 'bg-white text-black shadow-lg hover:bg-white/90' : 'text-white/40 hover:text-white/80'}`}
                 >
                     Job Search
                 </button>
                 <button
                     onClick={() => setActiveTab('analyze')}
-                    className={`px-6 py-2 rounded-full transition-all ${activeTab === 'analyze' ? 'bg-white/20 text-white shadow-lg' : 'text-white/40 hover:text-white/80'}`}
+                    className={`px-6 py-2 rounded-full transition-all ${activeTab === 'analyze' ? 'bg-white text-black shadow-lg hover:bg-white/90' : 'text-white/40 hover:text-white/80'}`}
                 >
                     AI Resume Check
                 </button>
@@ -152,7 +150,7 @@ const Dashboard = () => {
                                 className="border-t border-white/10 pt-6 mt-6"
                             >
                                 <div className="flex items-center gap-4 mb-4">
-                                    <div className="text-4xl font-bold text-emerald-400">{analysis.score}</div>
+                                    <div className="text-4xl font-bold text-white">{analysis.score}</div>
                                     <div>
                                         <h3 className="text-lg font-semibold text-white">ATS Match Score</h3>
                                         <p className="text-white/50 text-sm">Based on market standards</p>
@@ -160,17 +158,17 @@ const Dashboard = () => {
                                 </div>
                                 <div className="grid md:grid-cols-2 gap-6">
                                     <div>
-                                        <h4 className="text-purple-300 text-sm uppercase font-semibold mb-2">Key Skills</h4>
+                                        <h4 className="text-white/80 text-sm uppercase font-semibold mb-2">Key Skills</h4>
                                         <div className="flex flex-wrap gap-2">
                                             {analysis.skills?.map((skill, i) => (
-                                                <span key={i} className="px-3 py-1 bg-purple-500/20 rounded-full text-xs text-purple-200 border border-purple-500/20">
+                                                <span key={i} className="px-3 py-1 bg-white/10 rounded-full text-xs text-white border border-white/10">
                                                     {skill}
                                                 </span>
                                             ))}
                                         </div>
                                     </div>
                                     <div>
-                                        <h4 className="text-blue-300 text-sm uppercase font-semibold mb-2">Quick Summary</h4>
+                                        <h4 className="text-white/80 text-sm uppercase font-semibold mb-2">Quick Summary</h4>
                                         <p className="text-white/70 text-sm leading-relaxed">{analysis.summary}</p>
                                     </div>
                                 </div>
@@ -184,17 +182,17 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <AnimatePresence>
                     {jobs.map((job, idx) => (
-                        <GlassCard key={idx} delay={idx * 0.05} className="flex flex-col h-full hover:border-purple-400/30">
+                        <GlassCard key={idx} delay={idx * 0.05} className="flex flex-col h-full hover:border-white/30 group">
                             <div className="flex justify-between items-start mb-4">
                                 <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-xl font-bold text-white uppercase">
                                     {(job.company || "C")[0]}
                                 </div>
-                                <span className="px-2 py-1 bg-green-400/10 text-green-300 text-xs rounded border border-green-500/20">
+                                <span className="px-2 py-1 bg-white/10 text-white text-xs rounded border border-white/20">
                                     {job.type || "Full-time"}
                                 </span>
                             </div>
 
-                            <h3 className="text-lg font-semibold text-white mb-1 group-hover:text-purple-300 transition-colors">
+                            <h3 className="text-lg font-semibold text-white mb-1 group-hover:text-white/80 transition-colors">
                                 {job.title}
                             </h3>
                             <div className="flex items-center text-white/50 text-sm mb-4">

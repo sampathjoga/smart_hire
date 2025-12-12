@@ -4,15 +4,20 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 
+import ProtectedRoute from './components/ProtectedRoute';
+
 function App() {
   return (
     <Router>
-      <div className="min-h-screen text-white font-sans selection:bg-purple-500/30 selection:text-white">
+      <div className="min-h-screen text-white font-sans selection:bg-white/20 selection:text-white">
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+          </Route>
         </Routes>
       </div>
     </Router>
