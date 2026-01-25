@@ -11,6 +11,9 @@ const Register = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
 
+    const [showScoreModal, setShowScoreModal] = useState(false);
+    const [registrationData, setRegistrationData] = useState(null);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -55,16 +58,23 @@ const Register = () => {
                 body: formData, // Send the FormData object directly
             });
 
-            const data = await response.json();
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (jsonErr) {
+                // If backend returns plain text error (which caused the "Unexpected token" issue)
+                throw new Error(text || 'Server error (Invalid JSON Response)');
+            }
 
             if (!response.ok) {
                 throw new Error(data.message || 'Registration failed');
             }
 
-            // Success redirect
-            const scoreMsg = data.user?.score ? `ATS Score: ${data.user.score}/100. ` : '';
-            alert(`Registration successful! ${scoreMsg}Please login.`);
-            navigate('/login');
+            // Success - Show Score UI
+            setRegistrationData(data.user);
+            setShowScoreModal(true);
+            // navigate('/login'); // Moving navigation to Modal Close
 
         } catch (err) {
             console.error(err);
@@ -81,6 +91,31 @@ const Register = () => {
                 <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-[120px] animate-pulse"></div>
                 <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-emerald-600/10 rounded-full blur-[120px] animate-pulse delay-700"></div>
             </div>
+
+            {/* Score Modal */}
+            {showScoreModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-gray-900 border border-white/20 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl"
+                    >
+                        <div className="w-24 h-24 rounded-full border-4 border-emerald-500 flex items-center justify-center mx-auto mb-6 bg-emerald-500/10">
+                            <span className="text-4xl font-bold text-emerald-400">{registrationData?.score || 0}</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2">Registration Successful!</h3>
+                        <p className="text-white/60 mb-6">Your resume has passed the ATS check.</p>
+                        <p className="text-sm text-white/40 mb-8">Role: {registrationData?.role || 'Seeker'}</p>
+
+                        <Button
+                            onClick={() => navigate('/login')}
+                            className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl"
+                        >
+                            Continue to Login
+                        </Button>
+                    </motion.div>
+                </div>
+            )}
 
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}

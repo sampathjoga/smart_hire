@@ -11,10 +11,17 @@ const pdf = require("pdf-parse");
 const app = express();
 
 // Ensure uploads directory exists
+// Ensure uploads directory exists
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
 }
 const upload = multer({ dest: "uploads/" });
+
+// ===== SUPABASE CLIENT =====
+const { createClient } = require("@supabase/supabase-js");
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ===== MIDDLEWARE =====
 app.use(cors()); // allow requests from frontend (development)
@@ -165,8 +172,7 @@ app.get("/", (req, res) => {
 // =====================================================
 app.post("/api/auth/register", upload.single('resume'), async (req, res) => {
   console.log("=== NEW REGISTRATION ATTEMPT ===");
-  console.log("Request Body:", req.body);
-  console.log("Request File:", req.file);
+  // console.log("Request Body:", req.body); // Check logs if needed
 
   try {
     const { name, email, phone, password, role } = req.body;
@@ -176,17 +182,8 @@ app.post("/api/auth/register", upload.single('resume'), async (req, res) => {
       return res.status(400).json({ message: "Name, email and password are required" });
     }
 
-    // 2. Check if user exists
-    const existing = users.find((u) => u.email === email);
-    if (existing) {
-      // If file was uploaded but user exists, delete it to save space
-      if (req.file) fs.unlinkSync(req.file.path);
-      return res.status(400).json({ message: "Email already registered" });
-    }
-
-    // 3. ATS Analysis (if resume is uploaded)
+    // 2. ATS Analysis (if resume is uploaded)
     let atsScore = 0;
-    let resumePath = "";
 
     if (req.file) {
       try {
@@ -199,49 +196,71 @@ app.post("/api/auth/register", upload.single('resume'), async (req, res) => {
 
         // === ATS THRESHOLD CHECK ===
         if (atsScore < 60) {
-          // REJECT: Delete file and return error
           fs.unlinkSync(req.file.path);
           return res.status(400).json({
             message: `Registration Failed: ATS Score too low (${atsScore}/100). Minimum required is 60.`
           });
         }
 
-        resumePath = req.file.path; // Keep the file
+        // Clean up file
+        fs.unlinkSync(req.file.path);
 
       } catch (err) {
         console.error("Resume analysis failed:", err);
+        // Don't block registration if analysis fails? Or maybe block?
+        // User asked for "make sure dat is gopin into ddat abase... and solve deploy ment error"
+        // Let's return error to be safe as they want validation.
+        if (req.file) fs.unlinkSync(req.file.path);
         return res.status(500).json({ message: `Resume analysis failed: ${err.message}` });
       }
     } else {
-      // Fail if no resume? Or optional? 
-      // User asked "store resume... if ats > 70". Implies resume is mandatory.
-      return res.status(400).json({ message: "Resume upload is required for verification." });
+      return res.status(400).json({ message: "Resume upload is required." });
     }
 
-    // 4. Create User
-    const newUser = {
-      id: users.length + 1,
-      name,
-      email,
-      phone: phone || "",
-      password, // plain text for demo
-      role: role || "seeker",
-      resumePath: resumePath,
-      atsScore: atsScore
-    };
+    // 3. Create User in Supabase
+    // We use admin.createUser to skip email confirmation for this demo/MVP if service role key is used,
+    // or standard signUp if anon key. Assuming Service Role Key is available for backend operations is better.
+    // If using Anon key on backend, we typically just use signUp.
 
-    users.push(newUser);
-    saveUsers(); // Persist to file
-    console.log("Registered (JSON) user:", newUser);
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+          phone: phone,
+          role: role || 'seeker',
+          ats_score: atsScore, // Store score in metadata
+        }
+      }
+    });
+
+    if (error) {
+      console.error("Supabase Auth Error:", error);
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (!data.user) {
+      return res.status(500).json({ message: "Failed to create user (no user returned)" });
+    }
+
+    console.log("Registered Supabase user:", data.user.id);
 
     return res.status(201).json({
       message: "Registration successful",
-      user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role, score: atsScore },
+      user: {
+        id: data.user.id,
+        name: name,
+        email: email,
+        role: role,
+        score: atsScore
+      },
+      session: data.session // return session if auto-login is desired
     });
 
   } catch (err) {
     console.error("Register error:", err);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error: " + err.message });
   }
 });
 
