@@ -48,7 +48,7 @@ async function migrate() {
         */
 
     } catch (err) {
-        console.error('❌ Migration failed:', err);
+        console.error('❌ Migration failed:', JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
     } finally {
         await client.end();
     }
