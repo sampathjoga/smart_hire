@@ -4,7 +4,7 @@ import GlassCard from '../components/ui/GlassCard';
 import Button from '../components/ui/Button';
 import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { supabase } from '../lib/supabase';
+
 
 const Login = () => {
     const navigate = useNavigate();
@@ -20,16 +20,25 @@ const Login = () => {
         const password = e.target.password.value;
 
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email, password }),
             });
 
-            if (error) throw error;
+            const data = await response.json();
 
-            if (data.session) {
-                navigate('/dashboard');
+            if (!response.ok) {
+                throw new Error(data.message || 'Login failed');
             }
+
+            // Store token and user data
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+
+            navigate('/dashboard');
         } catch (err) {
             setError(err.message);
         } finally {

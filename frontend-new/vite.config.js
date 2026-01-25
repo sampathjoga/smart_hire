@@ -6,7 +6,6 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:3000',
-      '/register': 'http://localhost:3000',
       '/jobs': 'http://localhost:3000',
       '/analyze-resume': 'http://localhost:3000',
     }

@@ -4,7 +4,7 @@ import Button from '../components/ui/Button';
 import { Search, Upload, Briefcase, MapPin, DollarSign, LogOut, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -12,9 +12,11 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(false);
     const [analysis, setAnalysis] = useState(null); // { summary, score, skills }
     const [activeTab, setActiveTab] = useState('search'); // 'search' or 'analyze'
+    const [selectedJob, setSelectedJob] = useState(null);
 
-    const handleLogout = async () => {
-        await supabase.auth.signOut();
+    const handleLogout = () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
         navigate('/login');
     };
 
@@ -69,6 +71,15 @@ const Dashboard = () => {
         }
     };
 
+    const handleApplyClick = (job) => {
+        setSelectedJob(job);
+    };
+
+    const confirmApplication = () => {
+        alert(`Application submitted for ${selectedJob.title} at ${selectedJob.company}!`);
+        setSelectedJob(null);
+    };
+
     // Safe header container
     const Header = () => (
         <nav className="flex justify-between items-center py-6 mb-8">
@@ -82,7 +93,7 @@ const Dashboard = () => {
     );
 
     return (
-        <div className="container mx-auto px-4 pb-20 max-w-5xl">
+        <div className="container mx-auto px-4 pb-20 max-w-5xl relative">
             <Header />
 
             {/* Hero Section */}
@@ -211,7 +222,9 @@ const Dashboard = () => {
                                 </div>
                             </div>
 
-                            <Button className="w-full mt-4 text-sm py-2">Apply Now</Button>
+                            <Button onClick={() => handleApplyClick(job)} className="w-full mt-4 text-sm py-2">
+                                Apply Now
+                            </Button>
                         </GlassCard>
                     ))}
                 </AnimatePresence>
@@ -222,6 +235,73 @@ const Dashboard = () => {
                     <p>Ready to start? Search for jobs or analyze your resume above.</p>
                 </div>
             )}
+
+            {/* Job Details Modal */}
+            <AnimatePresence>
+                {selectedJob && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+                        >
+                            <GlassCard className="relative border border-white/20 shadow-2xl bg-[#0f0c19]"> {/* Solid-ish bg for readability */}
+                                <button
+                                    onClick={() => setSelectedJob(null)}
+                                    className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
+                                >
+                                    <span className="sr-only">Close</span>
+                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+
+                                <div className="mb-6">
+                                    <div className="w-16 h-16 rounded-xl bg-white/10 flex items-center justify-center text-3xl font-bold text-white uppercase mb-4">
+                                        {(selectedJob.company || "C")[0]}
+                                    </div>
+                                    <h2 className="text-3xl font-bold text-white mb-2">{selectedJob.title}</h2>
+                                    <div className="flex flex-wrap gap-4 text-white/60 text-sm">
+                                        <span className="flex items-center"><Briefcase className="w-4 h-4 mr-1.5" /> {selectedJob.company}</span>
+                                        <span className="flex items-center"><MapPin className="w-4 h-4 mr-1.5" /> {selectedJob.location}</span>
+                                        <span className="flex items-center"><DollarSign className="w-4 h-4 mr-1.5" /> {selectedJob.salaryRange}</span>
+                                        <span className="px-2 py-0.5 bg-white/10 rounded text-xs text-white border border-white/20">{selectedJob.type}</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-6 mb-8">
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-white mb-2">Job Description</h3>
+                                        <p className="text-white/70 leading-relaxed">
+                                            {selectedJob.description || "No specific description provided for this role. Join our team to make an impact!"}
+                                        </p>
+                                    </div>
+
+                                    {/* Mock Requirements Section since we don't have it in DB yet, dynamic placeholder */}
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-white mb-2">Requirements</h3>
+                                        <ul className="list-disc list-inside text-white/70 space-y-1">
+                                            <li>Experience with modern web technologies.</li>
+                                            <li>Strong problem-solving skills.</li>
+                                            <li>Excellent communication and teamwork abilities.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <Button onClick={() => setSelectedJob(null)} className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white">
+                                        Cancel
+                                    </Button>
+                                    <Button onClick={confirmApplication} className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600">
+                                        Confirm Application
+                                    </Button>
+                                </div>
+                            </GlassCard>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
