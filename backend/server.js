@@ -11,11 +11,15 @@ const pdf = require("pdf-parse");
 const app = express();
 
 // Ensure uploads directory exists
-// Ensure uploads directory exists
-if (!fs.existsSync("uploads")) {
-  fs.mkdirSync("uploads");
-}
-const upload = multer({ dest: "uploads/" });
+// Ensure uploads directory exists - REMOVED for Vercel (Read-only FS)
+// if (!fs.existsSync("uploads")) {
+//   fs.mkdirSync("uploads");
+// }
+// const upload = multer({ dest: "uploads/" }); // DISK STORAGE - BAD for Vercel
+
+// Use Memory Storage for Vercel/Lambda
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 // ===== SUPABASE CLIENT =====
 const { createClient } = require("@supabase/supabase-js");
@@ -95,38 +99,13 @@ async function analyzeWithGemini(text) {
 }
 
 // ===== FILE-BASED USER PERSISTENCE =====
-const USERS_FILE = "users.json";
-
-// Load users from file or initialize with default
-let users = [];
-if (fs.existsSync(USERS_FILE)) {
-  try {
-    const data = fs.readFileSync(USERS_FILE, "utf8");
-    users = JSON.parse(data);
-  } catch (err) {
-    console.error("Error reading users.json:", err);
-    users = [];
-  }
-} else {
-  // Initialize with default test user if file doesn't exist
-  users = [
-    {
-      id: 1,
-      name: "Test User",
-      email: "test@example.com",
-      password: "password123",
-      role: "seeker"
-    }
-  ];
-  saveUsers();
-}
+// ===== FILE-BASED USER PERSISTENCE (REMOVED FOR VERCEL + SUPABASE) =====
+// const USERS_FILE = "users.json";
+// ... (Legacy code removed) ...
+let users = []; // Keep as empty array if referenced elsewhere, but preferably remove usage.
 
 function saveUsers() {
-  try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-  } catch (err) {
-    console.error("Error writing users.json:", err);
-  }
+  // No-op for Vercel
 }
 
 const jobDatabase = [
@@ -187,7 +166,8 @@ app.post("/api/auth/register", upload.single('resume'), async (req, res) => {
 
     if (req.file) {
       try {
-        const dataBuffer = fs.readFileSync(req.file.path);
+        // const dataBuffer = fs.readFileSync(req.file.path); // DISK READ - REMOVED
+        const dataBuffer = req.file.buffer; // MEMORY READ
         const data = await pdf(dataBuffer);
         const analysis = await analyzeWithGemini(data.text);
 
@@ -196,21 +176,13 @@ app.post("/api/auth/register", upload.single('resume'), async (req, res) => {
 
         // === ATS THRESHOLD CHECK ===
         if (atsScore < 60) {
-          fs.unlinkSync(req.file.path);
           return res.status(400).json({
             message: `Registration Failed: ATS Score too low (${atsScore}/100). Minimum required is 60.`
           });
         }
 
-        // Clean up file
-        fs.unlinkSync(req.file.path);
-
       } catch (err) {
         console.error("Resume analysis failed:", err);
-        // Don't block registration if analysis fails? Or maybe block?
-        // User asked for "make sure dat is gopin into ddat abase... and solve deploy ment error"
-        // Let's return error to be safe as they want validation.
-        if (req.file) fs.unlinkSync(req.file.path);
         return res.status(500).json({ message: `Resume analysis failed: ${err.message}` });
       }
     } else {
@@ -343,15 +315,26 @@ app.post("/analyze-resume", upload.single("resume"), async (req, res) => {
       return res.status(400).json({ error: "Resume file required" });
     }
 
-    const resumeText = fs.readFileSync(resumeFile.path, "utf8");
+    // const resumeText = fs.readFileSync(resumeFile.path, "utf8"); // REMOVED
+    const resumeText = await (async () => {
+      // Simple buffer to text (assuming txt or pdf parsing needed? Original code just read as utf8 text? 
+      // Wait, original readFileSync(path, 'utf8') assumes it's a TEXT file, not PDF.
+      // But the previous flow allowed PDF upload. 
+      // If the original worked with PDF uploaded as text, that's weird. 
+      // Let's assume it needs PDF parsing if pdf.
+      if (req.file.mimetype === 'application/pdf') {
+        const data = await pdf(req.file.buffer);
+        return data.text;
+      }
+      return req.file.buffer.toString('utf8');
+    })();
 
     // Perform Analysis
     const parsedAnalysis = await analyzeWithGemini(resumeText);
 
-    // Remove temp file
-    fs.unlinkSync(resumeFile.path);
+    // Remove temp file - REMOVED
 
-    // Dummy recommended jobs based on skills (in a real app, search DB)
+    // Dummy recommended jobs...
     const recommendedJobs = [
       { title: "Senior Developer", company: "TechCorp", location: "Remote", type: "Full-time", salaryRange: "$120k - $150k" },
       { title: "Frontend Engineer", company: "WebSolutions", location: "New York", type: "Contract", salaryRange: "$90k - $110k" },
