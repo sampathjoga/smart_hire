@@ -1,408 +1,167 @@
-// backend/server.js
-require("dotenv").config();
-const express = require("express");
-const multer = require("multer");
-const bodyParser = require("body-parser");
-const fetch = require("node-fetch");
-const fs = require("fs");
-const cors = require("cors");
-const pdf = require("pdf-parse");
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const path = require('path');
+const Job = require('./models/Job');
+const http = require('http');
+const socketIo = require('socket.io');
+
+dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, { cors: { origin: '*' } });
 
-// Ensure uploads directory exists
-// Ensure uploads directory exists - REMOVED for Vercel (Read-only FS)
-// if (!fs.existsSync("uploads")) {
-//   fs.mkdirSync("uploads");
-// }
-// const upload = multer({ dest: "uploads/" }); // DISK STORAGE - BAD for Vercel
-
-// Use Memory Storage for Vercel/Lambda
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
-
-// ===== SUPABASE CLIENT =====
-const { createClient } = require("@supabase/supabase-js");
-const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// ===== MIDDLEWARE =====
-app.use(cors()); // allow requests from frontend (development)
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-// ... Helper for Gemini Analysis ...
-async function analyzeWithGemini(text) {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `Analyze this resume and give ATS score (0-100). Also provide a short summary and list 3 key skills. Format the response as JSON with keys: 'score' (number), 'summary' (string), 'skills' (array of strings).\n\nResume Text:\n${text}`,
-              },
-            ],
-          },
-        ],
-      }),
-    }
-  );
-
-  console.log(`Gemini API Response: ${response.status} ${response.statusText}`);
-  let data;
-  try {
-    data = await response.json();
-  } catch (err) {
-    console.error("Failed to parse API response JSON");
-  }
-
-  if (!response.ok) {
-    console.error("Gemini API Error Body:", JSON.stringify(data, null, 2));
-
-    // === FALLBACK: MOCK ANALYSIS IF API FAILS (429, 404, etc) ===
-    console.log("⚠️ API Failed. Using Mock Analysis Fallback to unblock Registration.");
-
-    // Simple keyword based "fake" score for testing
-    const keywords = ["javascript", "node", "react", "python", "sql", "java", "aws"];
-    const textLower = text.toLowerCase();
-    let matchCount = 0;
-    keywords.forEach(k => { if (textLower.includes(k)) matchCount++; });
-
-    // Ensure score is at least 75 if they have some keywords, so they pass the >70 check
-    const mockScore = matchCount > 0 ? 75 + (matchCount * 2) : 60;
-
-    return {
-      score: Math.min(mockScore, 95),
-      summary: "Mock Analysis (API Quota Exceeded). Detected keywords: " + matchCount,
-      skills: ["Mock Skill 1", "Mock Skill 2", "Mock Skill 3"]
-    };
-  }
-
-  let outputText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-  // Clean up markdown code blocks if present
-  outputText = outputText.replace(/```json/g, '').replace(/```/g, '').trim();
-  console.log("Gemini Raw Output:", outputText);
-
-  try {
-    return JSON.parse(outputText);
-  } catch (e) {
-    console.error("Failed to parse Gemini JSON:", e);
-    // Fallback object if parsing fails
-    return { score: 0, summary: "Could not analyze resume.", skills: [] };
-  }
-}
-
-// ===== FILE-BASED USER PERSISTENCE =====
-// ===== FILE-BASED USER PERSISTENCE (REMOVED FOR VERCEL + SUPABASE) =====
-// const USERS_FILE = "users.json";
-// ... (Legacy code removed) ...
-let users = []; // Keep as empty array if referenced elsewhere, but preferably remove usage.
-
-function saveUsers() {
-  // No-op for Vercel
-}
-
-const jobDatabase = [
-  { id: 101, title: "Senior Software Engineer", company: "TechNova", location: "Bangalore", type: "Full-time", salaryRange: "₹25L - ₹40L", description: "Expert in Node.js and React." },
-  { id: 102, title: "DevOps Engineer", company: "CloudScale", location: "Remote", type: "Full-time", salaryRange: "₹18L - ₹30L", description: "Experience with AWS, Docker, Kubernetes." },
-  { id: 103, title: "Data Scientist", company: "DataMinds", location: "Hyderabad", type: "Full-time", salaryRange: "₹20L - ₹35L", description: "Strong background in Python and ML." },
-  { id: 104, title: "Frontend Developer", company: "CreativeTech", location: "Mumbai", type: "Contract", salaryRange: "₹12L - ₹20L", description: "Vue.js or React master." },
-  { id: 105, title: "Cybersecurity Analyst", company: "SecureNet", location: "Pune", type: "Full-time", salaryRange: "₹15L - ₹28L", description: "Network security and compliance." },
-  { id: 106, title: "Full Stack Developer", company: "StartUp Hub", location: "Delhi", type: "Full-time", salaryRange: "₹10L - ₹18L", description: "MERN stack proficiency." },
-  { id: 107, title: "Cloud Architect", company: "Global Systems", location: "Remote", type: "Full-time", salaryRange: "₹45L - ₹60L", description: "Azure and Google Cloud solutions." },
-  { id: 108, title: "QA Automation Engineer", company: "QualityFirst", location: "Bangalore", type: "Full-time", salaryRange: "₹12L - ₹22L", description: "Selenium and Cypress." }
-];
-
-// ... (Health Check) ...
-
-// =====================================================
-// 7) JOB SEARCH
-// =====================================================
-app.get("/jobs", (req, res) => {
-  const { q } = req.query;
-  let results = jobDatabase;
-
-  if (q) {
-    const term = q.toLowerCase();
-    results = results.filter(job =>
-      job.title.toLowerCase().includes(term) ||
-      job.company.toLowerCase().includes(term) ||
-      job.location.toLowerCase().includes(term)
-    );
-  }
-
-  res.json({ jobs: results });
+io.on('connection', (socket) => {
+    socket.on('join', (userId) => {
+        socket.join(userId);
+    });
 });
 
-// ===== HEALTH CHECK =====
-app.get("/", (req, res) => {
-  res.send("SmartHire backend is running");
+app.set('io', io);
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+
+const { MongoMemoryServer } = require('mongodb-memory-server');
+
+const authRoutes = require('./routes/auth');
+const profileRoutes = require('./routes/profile');
+const jobRoutes = require('./routes/jobs');
+const applicationRoutes = require('./routes/applications');
+const employerRoutes = require('./routes/employer');
+
+app.get('/', (req, res) => {
+    res.json({ message: 'Job Board Backend API is running' });
 });
 
-// =====================================================
-// 1) NEW: JSON REGISTER (used by register.html)
-//     POST /api/auth/register
-// =====================================================
-app.post("/api/auth/register", upload.single('resume'), async (req, res) => {
-  console.log("=== NEW REGISTRATION ATTEMPT ===");
-  // console.log("Request Body:", req.body); // Check logs if needed
+app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/jobs', jobRoutes);
+app.use('/api/applications', applicationRoutes);
+app.use('/api/employer', employerRoutes);
 
-  try {
-    const { name, email, phone, password, role } = req.body;
+// Database Connection Logic
+const connectDB = async () => {
+    const PORT = process.env.PORT || 5000;
+    let mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/jobboard';
 
-    // 1. Basic Validation
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: "Name, email and password are required" });
-    }
-
-    // 2. ATS Analysis (if resume is uploaded)
-    let atsScore = 0;
-
-    if (req.file) {
-      try {
-        // const dataBuffer = fs.readFileSync(req.file.path); // DISK READ - REMOVED
-        const dataBuffer = req.file.buffer; // MEMORY READ
-        const data = await pdf(dataBuffer);
-        const analysis = await analyzeWithGemini(data.text);
-
-        atsScore = analysis.score || 0;
-        console.log(`ATS Analysis for ${email}: Score ${atsScore}`);
-
-        // === ATS THRESHOLD CHECK ===
-        if (atsScore < 60) {
-          return res.status(400).json({
-            message: `Registration Failed: ATS Score too low (${atsScore}/100). Minimum required is 60.`
-          });
+    try {
+        // Try connecting to local MongoDB first
+        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 2000 });
+        console.log('Connected to local MongoDB');
+    } catch (err) {
+        console.log('Local MongoDB not found. Initializing In-Memory Database for zero-config setup...');
+        try {
+            const mongod = await MongoMemoryServer.create();
+            mongoUri = mongod.getUri();
+            await mongoose.connect(mongoUri);
+            console.log('Connected to In-Memory MongoDB');
+        } catch (memErr) {
+            console.error('CRITICAL: Could not connect to any database.', memErr.message);
+            process.exit(1);
         }
-
-      } catch (err) {
-        console.error("Resume analysis failed:", err);
-        return res.status(500).json({ message: `Resume analysis failed: ${err.message}` });
-      }
-    } else {
-      return res.status(400).json({ message: "Resume upload is required." });
     }
 
-    // 3. Create User in Supabase
-    // We use admin.createUser to skip email confirmation for this demo/MVP if service role key is used,
-    // or standard signUp if anon key. Assuming Service Role Key is available for backend operations is better.
-    // If using Anon key on backend, we typically just use signUp.
+    // Seed jobs if none exist
+    const jobCount = await Job.countDocuments();
+    if (jobCount === 0) {
+        const jobsData = [
+            {
+                job_title: "Software Engineer, Backend",
+                company_name: "Coinbase",
+                job_location: "Remote",
+                employment_type: "Full-time",
+                experience_required: "Intermediate / Senior",
+                skills_required: ["Backend Development", "Go", "Ruby", "Distributed Systems", "Cloud Infrastructure"],
+                salary_range: "Competitive",
+                job_description: "Drive the development of Coinbase's core trading and financial services backend. Focus on scalability, security, and high-performance distributed systems in a remote-first environment.",
+                apply_link: "https://www.coinbase.com/careers",
+                source_type: "Company Site",
+                category: "IT",
+                tags: ["Crypto", "Remote", "High-Scale"],
+                is_remote: true,
+                is_fresher_friendly: false
+            },
+            {
+                job_title: "Infrastructure Software Engineer",
+                company_name: "Dropbox",
+                job_location: "Remote",
+                employment_type: "Full-time",
+                experience_required: "3-5+ years",
+                skills_required: ["Infrastructure", "Python", "Go", "Rust", "Distributed Systems", "Kubernetes"],
+                salary_range: "Market Rate",
+                job_description: "Build and maintain the foundational infrastructure that powers Dropbox. Responsible for reliability, performance, and automation of large-scale storage and compute systems.",
+                apply_link: "https://www.dropbox.com/jobs",
+                source_type: "Company Site",
+                category: "IT",
+                tags: ["Storage", "Cloud", "SaaS"],
+                is_remote: true,
+                is_fresher_friendly: false
+            },
+            {
+                job_title: "Software Engineer (Full Stack)",
+                company_name: "Arcadia",
+                job_location: "Remote / New York, NY",
+                employment_type: "Full-time",
+                experience_required: "2+ years",
+                skills_required: ["JavaScript", "TypeScript", "React", "Node.js", "PostgreSQL"],
+                salary_range: "Available on request",
+                job_description: "Join the team building a data-driven platform for the clean energy future. Work across the stack to deliver user-facing features and robust API services.",
+                apply_link: "https://www.arcadia.com/careers",
+                source_type: "Company Site",
+                category: "IT",
+                tags: ["CleanTech", "Full-Stack", "Green-Energy"],
+                is_remote: true,
+                is_fresher_friendly: false
+            },
+            {
+                job_title: "Software Engineer I, Backend (New Grad - 2025)",
+                company_name: "Flex",
+                job_location: "Chicago, IL / Seattle, WA",
+                employment_type: "Internship",
+                experience_required: "Recent Graduate",
+                skills_required: ["Java", "Python", "Data Structures", "Algorithms", "Problem Solving"],
+                salary_range: "Competitive Hourly",
+                job_description: "Entry-level backend role focusing on system design, code quality, and learning scalable architecture. Open to 2025 graduates with strong CS fundamentals.",
+                apply_link: "https://www.flex.com/careers",
+                source_type: "Company Site",
+                category: "Internship",
+                tags: ["New-Grad", "Mentorship", "Big-Tech"],
+                is_remote: false,
+                is_fresher_friendly: true
+            },
+            {
+                job_title: "Data Analyst",
+                company_name: "Ministry of National Food Security & Research",
+                job_location: "Islamabad, Pakistan",
+                employment_type: "Full-time",
+                experience_required: "2+ years",
+                skills_required: ["Data Analysis", "Statistical Modeling", "SQL", "Policy Research"],
+                salary_range: "Government Scale",
+                job_description: "Analyze agricultural and food security data to inform national policy and research initiatives. Collaborate with various government departments for data-driven insights.",
+                apply_link: "https://njp.gov.pk",
+                source_type: "Govt Portal",
+                category: "Government",
+                tags: ["Govt", "Data-Science", "National-Policy"],
+                is_remote: false,
+                is_fresher_friendly: false
+            }
+        ];
+        await Job.insertMany(jobsData);
+        console.log('Detected empty Job collection. Seeded fresh job data.');
+    }
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: name,
-          phone: phone,
-          role: role || 'seeker',
-          ats_score: atsScore, // Store score in metadata
-        }
-      }
+    server.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log(`Visit http://localhost:${PORT} to verify`);
     });
+};
 
-    if (error) {
-      console.error("Supabase Auth Error:", error);
-      return res.status(400).json({ message: error.message });
-    }
-
-    if (!data.user) {
-      return res.status(500).json({ message: "Failed to create user (no user returned)" });
-    }
-
-    console.log("Registered Supabase user:", data.user.id);
-
-    return res.status(201).json({
-      message: "Registration successful",
-      user: {
-        id: data.user.id,
-        name: name,
-        email: email,
-        role: role,
-        score: atsScore
-      },
-      session: data.session // return session if auto-login is desired
-    });
-
-  } catch (err) {
-    console.error("Register error:", err);
-    return res.status(500).json({ message: "Server error: " + err.message });
-  }
-});
-
-// =====================================================
-// 2) NEW: LOGIN (used by login.html)
-//     POST /api/auth/login
-// =====================================================
-app.post("/api/auth/login", (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res
-        .status(400)
-        .json({ message: "Email and password are required" });
-    }
-
-    const user = users.find((u) => u.email === email);
-    if (!user || user.password !== password) {
-      return res.status(400).json({ message: "Invalid email or password" });
-    }
-
-    // For now, return a dummy token – later replace with JWT
-    const token = "dummy-token-" + user.id;
-
-    return res.json({
-      message: "Login successful",
-      token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
-    });
-  } catch (err) {
-    console.error("Login error:", err);
-    return res.status(500).json({ message: "Server error" });
-  }
-});
-
-// =====================================================
-// 3) EXISTING: /register WITH GEMINI ATS + RESUME UPLOAD
-//     used by your old form with multipart/form-data
-// =====================================================
-app.post("/register", upload.single("resume"), async (req, res) => {
-  try {
-    const { name, email, phone, password } = req.body; // currently not stored
-    const resumeFile = req.file;
-
-    if (!resumeFile) {
-      return res.status(400).json({ error: "Resume file required" });
-    }
-
-    // Read uploaded resume file as text
-    const resumeText = fs.readFileSync(resumeFile.path, "utf8");
-
-    const output = await analyzeWithGemini(resumeText);
-
-    // try to extract a number as ATS score
-    const scoreMatch = output.match(/(\d{1,3})/);
-    const atsScore = scoreMatch ? parseInt(scoreMatch[1], 10) : null;
-
-    // Remove temp file
-    fs.unlinkSync(resumeFile.path);
-
-    return res.json({
-      message: `Registration successful for ${name}`,
-      atsScore,
-      atsAnalysis: output,
-    });
-  } catch (err) {
-    console.error("Gemini /register error:", err);
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// =====================================================
-// 4) NEW: /analyze-resume (used by Dashboard.jsx)
-// =====================================================
-app.post("/analyze-resume", upload.single("resume"), async (req, res) => {
-  try {
-    const resumeFile = req.file;
-    if (!resumeFile) {
-      return res.status(400).json({ error: "Resume file required" });
-    }
-
-    // const resumeText = fs.readFileSync(resumeFile.path, "utf8"); // REMOVED
-    const resumeText = await (async () => {
-      // Simple buffer to text (assuming txt or pdf parsing needed? Original code just read as utf8 text? 
-      // Wait, original readFileSync(path, 'utf8') assumes it's a TEXT file, not PDF.
-      // But the previous flow allowed PDF upload. 
-      // If the original worked with PDF uploaded as text, that's weird. 
-      // Let's assume it needs PDF parsing if pdf.
-      if (req.file.mimetype === 'application/pdf') {
-        const data = await pdf(req.file.buffer);
-        return data.text;
-      }
-      return req.file.buffer.toString('utf8');
-    })();
-
-    // Perform Analysis
-    const parsedAnalysis = await analyzeWithGemini(resumeText);
-
-    // Remove temp file - REMOVED
-
-    // Dummy recommended jobs...
-    const recommendedJobs = [
-      { title: "Senior Developer", company: "TechCorp", location: "Remote", type: "Full-time", salaryRange: "$120k - $150k" },
-      { title: "Frontend Engineer", company: "WebSolutions", location: "New York", type: "Contract", salaryRange: "$90k - $110k" },
-      { title: "Full Stack Dev", company: "StartupX", location: "San Francisco", type: "Full-time", salaryRange: "$130k+" }
-    ];
-
-    return res.json({
-      message: "Analysis successful",
-      parsed: parsedAnalysis,
-      recommendedJobs
-    });
-
-  } catch (err) {
-    console.error("/analyze-resume error:", err);
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// ===== ERROR HANDLING =====
-// Force JSON for 404
-app.use((req, res) => {
-  res.status(404).json({ message: "Endpoint not found" });
-});
-
-// Global Error Handler
-app.use((err, req, res, next) => {
-  console.error("Global Server Error:", err);
-  res.status(500).json({ message: "Internal Server Error", error: err.message });
-});
-
-// ===== START SERVER =====
-// Export for Vercel (serverless)
-module.exports = app;
-
-// ===== SYSTEM SAFETY & SEEDING =====
-
-// 5) Health Check
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", uptime: process.uptime() });
-});
-
-// 6) Seed Data
-app.post("/api/seed", (req, res) => {
-  // Add some dummy users if empty
-  if (users.length === 0) {
-    users.push(
-      { id: 1, name: "Alice Admin", email: "alice@example.com", password: "password123", role: "admin" },
-      { id: 2, name: "Bob Builder", email: "bob@example.com", password: "password123", role: "seeker" }
-    );
-  }
-  return res.json({ message: "Seeded successfully", users_count: users.length });
-});
-
-// Prevent crash on unhandled errors
-process.on('uncaughtException', (err) => {
-  console.error('CRITICAL: Uncaught Exception:', err);
-  // In production you might exit, but for this demo we keep running to avoid "Connection Refused"
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
-});
+connectDB();
 
 
-// Only listen if run directly
-if (require.main === module) {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () =>
-    console.log(`Backend running on http://localhost:${PORT}`)
-  );
-}
